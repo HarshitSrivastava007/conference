@@ -1,5 +1,6 @@
-import Image from "next/image";
+import React from "react";
+import CreateMeetingPage from "./CreateMeetingPage";
 
 export default function Home() {
-  return <></>;
+  return <CreateMeetingPage />;
 }
