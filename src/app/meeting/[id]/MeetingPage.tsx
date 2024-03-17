@@ -95,7 +95,7 @@ function MeetingScreen() {
       {setupComplete ? (
         <CallUI />
       ) : (
-        <SetupUI onSetupComplete={() => handleSetupComplete} />
+        <SetupUI onSetupComplete={handleSetupComplete} />
       )}
     </div>
   );
