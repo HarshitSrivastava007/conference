@@ -50,7 +50,7 @@ function useIntializeVideoClient() {
       const id = nanoid();
       streamUser = {
         id,
-        name: "guest",
+        type: "guest",
         image: `Guest ${id}`,
       };
     }

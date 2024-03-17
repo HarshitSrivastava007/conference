@@ -1,9 +1,16 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
-import { Loader2 } from "lucide-react";
+import {
+  Call,
+  MemberRequest,
+  useStreamVideoClient,
+} from "@stream-io/video-react-sdk";
+import { Copy, Loader2 } from "lucide-react";
 import React, { useState } from "react";
+import { getUserIds } from "./actions";
+import Button from "../components/Button";
+import Link from "next/link";
 
 function CreateMeetingPage() {
   const [descriptionInput, setDescriptionInput] = useState("");
@@ -21,10 +28,31 @@ function CreateMeetingPage() {
 
     try {
       const id = crypto.randomUUID();
-      const call = client.call("default", id);
+      const callType = participantsInput ? "private-meeting" : "default";
+      const call = client.call(callType, id);
+
+      const memberEmails = participantsInput
+        .split(",")
+        .map((email) => email.trim());
+
+      const memberIds = await getUserIds(memberEmails);
+
+      const members: MemberRequest[] = memberIds
+        .map((memberId) => ({
+          user_id: memberId,
+          role: "call_member",
+        }))
+        .concat({ user_id: user.id, role: "call_member" })
+        .filter(
+          (v, i, a) => a.findIndex((v2) => v2.user_id === v.user_id) === i,
+        );
+
+      const starts_at = new Date(startTimeInput || Date.now()).toISOString();
 
       await call.getOrCreate({
         data: {
+          starts_at,
+          members,
           custom: { description: descriptionInput },
         },
       });
@@ -53,9 +81,9 @@ function CreateMeetingPage() {
           value={participantsInput}
           onChange={setParticipantsInput}
         />
-        <button onClick={createMeeting} className="w-full">
+        <Button onClick={createMeeting} className="w-full">
           Create meeting
-        </button>
+        </Button>
       </div>
       {call && <MeetingLink call={call} />}
     </div>
@@ -212,5 +240,58 @@ interface MeetingLinkProps {
 
 function MeetingLink({ call }: MeetingLinkProps) {
   const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${call.id}`;
-  return <div>{meetingLink}</div>;
+  return (
+    <div className="flex flex-col items-center gap-3 text-center">
+      <div className="flex items-center gap-3">
+        <span>
+          Invitation link:{" "}
+          <Link href={meetingLink} className="font-medium">
+            {meetingLink}
+          </Link>
+        </span>
+        <button
+          title="Copy initation link"
+          onClick={() => {
+            navigator.clipboard.writeText(meetingLink);
+          }}
+        >
+          <Copy />
+        </button>
+      </div>
+      <a
+        href={getMailtoLink(
+          meetingLink,
+          call.state.startsAt,
+          call.state.custom.description,
+        )}
+        target="_blank"
+        className="text-blue-500 hover:underline"
+      >
+        Send email invitation
+      </a>
+    </div>
+  );
+}
+
+function getMailtoLink(
+  meetingLink: string,
+  startsAt?: Date,
+  description?: string,
+) {
+  const startDateFormatted = startsAt
+    ? startsAt.toLocaleString("en-US", {
+        dateStyle: "full",
+        timeStyle: "short",
+      })
+    : undefined;
+
+  const subject =
+    "Join my meeting" + (startDateFormatted ? ` at ${startDateFormatted}` : "");
+
+  const body =
+    `Join my meeting at ${meetingLink}.` +
+    (startDateFormatted ? `\n\nThe starts at ${startDateFormatted}.` : "") +
+    (description ? `\n\nDescription: ${description}` : "");
+
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
