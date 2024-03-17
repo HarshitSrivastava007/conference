@@ -1,22 +1,24 @@
 "use client";
 
 import {
-  Call,
-  CallControls,
-  SpeakerLayout,
+  CallingState,
+  DeviceSettings,
   StreamCall,
   StreamTheme,
-  useCall,
+  VideoPreview,
   useCallStateHooks,
-  useStreamVideoClient,
 } from "@stream-io/video-react-sdk";
 import { Loader2 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import useLoadcall from "../../../hooks/useLoadCall";
 import { useUser } from "@clerk/clerk-react";
 import useStreamCall from "@/hooks/useStreamCall";
 import Link from "next/link";
-import { buttonClassName } from "@/components/Button";
+import Button, { buttonClassName } from "@/components/Button";
+import PermissionPrompt from "@/components/PermissionPrompt";
+import { AudioVolumeIndicator } from "@/components/AudioVolumeIndicator";
+import FlexibleCallLayout from "@/components/FlexibleCallLayout";
+import RecordingsList from "@/components/RecordingsList";
 
 interface MeetingPageProps {
   id: string;
@@ -38,7 +40,7 @@ function MeetingPage({ id }: MeetingPageProps) {
     call.type === "private-meeting" &&
     (!user || !call.state.members.find((m) => m.user.id === user.id));
 
-  if (!notAllowedtoJoin) {
+  if (notAllowedtoJoin) {
     return (
       <p className="text-center font-bold">
         You are not allowed to join this meeting
@@ -48,10 +50,8 @@ function MeetingPage({ id }: MeetingPageProps) {
 
   return (
     <StreamCall call={call}>
-      <StreamTheme className="space-y-3">
+      <StreamTheme>
         <MeetingScreen />
-        {/* <SpeakerLayout />
-        <CallControls /> */}
       </StreamTheme>
     </StreamCall>
   );
@@ -60,13 +60,22 @@ function MeetingPage({ id }: MeetingPageProps) {
 export default MeetingPage;
 
 function MeetingScreen() {
+  const call = useStreamCall();
   const { useCallEndedAt, useCallStartsAt } = useCallStateHooks();
 
   const callEndedAt = useCallEndedAt();
   const callStartsAt = useCallStartsAt();
 
+  const [setupComplete, setSetupComplete] = useState(false);
+
+  async function handleSetupComplete() {
+    call.join();
+    setSetupComplete(true);
+  }
+
   const callIsInFuture = callStartsAt && new Date(callStartsAt) > new Date();
   const callHasEnded = !!callEndedAt;
+  const description = call.state.custom.description;
 
   if (callHasEnded) {
     return <MeetingEndedScreen />;
@@ -76,7 +85,77 @@ function MeetingScreen() {
     return <UpcomingMeetingScreen />;
   }
 
-  return <div>Call Ui</div>;
+  return (
+    <div className="space-y-6">
+      {description && (
+        <p className="text-center">
+          Meeting description: <span className="font-bold">{description}</span>{" "}
+        </p>
+      )}
+      {setupComplete ? (
+        <CallUI />
+      ) : (
+        <SetupUI onSetupComplete={() => handleSetupComplete} />
+      )}
+    </div>
+  );
+}
+
+interface SetupUIProps {
+  onSetupComplete: () => void;
+}
+
+function SetupUI({ onSetupComplete }: SetupUIProps) {
+  const call = useStreamCall();
+  const { useMicrophoneState, useCameraState } = useCallStateHooks();
+
+  const micState = useMicrophoneState();
+  const camState = useCameraState();
+  const [micCamDisabled, setMicCamDisabled] = useState(false);
+
+  useEffect(() => {
+    if (micCamDisabled) {
+      call.camera.disable();
+      call.microphone.disable();
+    } else {
+      call.camera.enable();
+      call.microphone.enable();
+    }
+  }, [micCamDisabled, call]);
+
+  if (!micState.hasBrowserPermission || !camState.hasBrowserPermission) {
+    return <PermissionPrompt />;
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <h1 className="text-center text-2xl font-bold"></h1>
+      <VideoPreview />
+      <div className="flex h-16 items-center gap-3">
+        <AudioVolumeIndicator />
+        <DeviceSettings />
+      </div>
+      <label className="flex items-center gap-3 font-medium">
+        <input
+          type="checkbox"
+          checked={micCamDisabled}
+          onChange={(e) => setMicCamDisabled(e.target.checked)}
+        />
+        Join with mic and camera off
+      </label>
+      <Button onClick={onSetupComplete}>Join Meeting</Button>
+    </div>
+  );
+}
+
+function CallUI() {
+  const { useCallCallingState } = useCallStateHooks();
+  const callingState = useCallCallingState();
+
+  if (callingState !== CallingState.JOINED) {
+    return <Loader2 className="mx-auto animate-spin" />;
+  }
+  return <FlexibleCallLayout />;
 }
 
 function MeetingEndedScreen() {
@@ -86,6 +165,10 @@ function MeetingEndedScreen() {
       <Link href="/">
         <a className={buttonClassName}>Go home</a>
       </Link>
+      <div className="space-y-3">
+        <h2 className="text-center text-xl font-bold">Recordings</h2>
+        <RecordingsList />
+      </div>
     </div>
   );
 }
@@ -98,13 +181,15 @@ function UpcomingMeetingScreen() {
       <p>
         This meeting is not started yet. It will be started at{" "}
         <span className="font-bold">
-          {call.state.startsAt.toLocaleString()}
+          {call?.state?.startsAt.toLocaleString()}
         </span>
       </p>
-      <p>
-        Description:{" "}
-        <span className="font-bold">{call?.state.custom.description}</span>
-      </p>
+      {call?.state.custom.description && (
+        <p>
+          Description:{" "}
+          <span className="font-bold">{call?.state.custom.description}</span>
+        </p>
+      )}
       <Link href={"/"} className={buttonClassName}>
         Go home
       </Link>
