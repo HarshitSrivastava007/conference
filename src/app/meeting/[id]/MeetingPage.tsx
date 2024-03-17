@@ -181,7 +181,7 @@ function UpcomingMeetingScreen() {
       <p>
         This meeting is not started yet. It will be started at{" "}
         <span className="font-bold">
-          {call?.state?.startsAt.toLocaleString()}
+          {call.state.startsAt?.toLocaleString()}
         </span>
       </p>
       {call?.state.custom.description && (
