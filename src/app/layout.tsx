@@ -1,6 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import Navbar from "../components/Navbar";
@@ -25,7 +26,11 @@ export default function RootLayout({
         <body className={inter.className}>
           <ClientProvider>
             <Navbar />
-            <main className="max-auto max-w-5xl px-3 py-6">{children}</main>
+            {/* <ThemeProvider> */}
+            <main className="relative mt-14 flex flex-col justify-center overflow-hidden">
+              {children}
+            </main>
+            {/* </ThemeProvider> */}
           </ClientProvider>
         </body>
       </html>

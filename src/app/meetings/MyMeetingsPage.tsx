@@ -56,7 +56,7 @@ function MeetingItem({ call }: MeetingItemProps) {
     call.state.startsAt && new Date(call.state.startsAt) > new Date();
   const hasEnded = !!call.state.endedAt;
   return (
-    <li>
+    <li className="relative mt-10 flex justify-center overflow-hidden">
       <Link href={meetingLink} className="hover:underline">
         {call.state.startsAt?.toLocaleString()}
         {isInFuture && " (Upcoming)"}
